@@ -4,203 +4,220 @@ const express = require('express');
 const app = express();
 const port = WORKFLOW_SERVICE_PORT;
 
-
 app.use(express.json());
 
-export type StepType =  {
+export type StepType = {
   name: string;
   type: 'action' | 'condition';
   startStep?: boolean;
   finishStep?: boolean;
   id: string;
   action?: {
-    type: 'FETCH'
+    type: 'FETCH';
     url: string;
     method: 'GET' | 'POST';
     body?: Record<string, unknown>;
     nextStepId?: string;
-  }
+  };
   logic?: {
     type: 'EQUALS' | 'GREATER_THAN' | 'LESS_THAN';
     operands: {
       left: string;
       right: string;
-    },
+    };
     conditionMetNextStepId: string;
     conditionFailedNextStepId: string;
-  }
+  };
 };
 
 export type WorkflowDefinition = {
   steps: StepType[];
 };
 
-
 const OperationToOperatorMap = {
   EQUALS: '=',
   GREATER_THAN: '>',
   LESS_THAN: '<'
-}
-
-const findFirstLastStep = (steps: StepType[]) => {
-  return [steps.find(step => step.startStep), steps.find(step => step.finishStep)] as [StepType, StepType];
-}
+};
 
 type StepResult = {
   status: 'success' | 'error';
   condition?: 'met' | 'not_met';
-  payload?: Record<string, {key: string, value: string}>;
+  input?: StepResult | null;
+  output?: Record<string, unknown>;
   error?: Error;
-}
+};
 
-type WorkflowResult = {
-  stepsTrace: Record<string, StepResult>;
-}
+type StepPipeData = {
+  input: StepResult | null;
+  output: StepResult;
+  error?: Error;
+  status: 'completed' | 'in_progress' | 'failed';
+};
+
+const findFirstLastStep = (steps: StepType[]) => {
+  return [
+    steps.find(step => step.startStep),
+    steps.find(step => step.finishStep)
+  ] as [StepType, StepType];
+};
 
 export class Step {
   stepSchema: StepType;
   nextStepId: string;
   status: 'completed' | 'in_progress' | 'created' | 'failed';
-  payload: Record<string, unknown> = {};
+
   constructor(stepSchema: StepType) {
     this.stepSchema = stepSchema;
     this.nextStepId = stepSchema.action?.nextStepId || '';
     this.status = 'created';
   }
 
-  async process(): Promise<StepResult> {
+  async process(input: StepResult | null = null): Promise<StepPipeData> {
     this.status = 'in_progress';
-    if (this.stepSchema.type === 'action') {
-      const res = await this.processAction();
-      this.status = 'completed';
-      return res;
-    }
-    if (this.stepSchema.type === 'condition') {
-      const res = await this.processCondition();
-      this.status = 'completed';
-      return res;
-    }
-    throw new Error('Invalid step type');
-  }
 
-  async makeHttpRequest(): Promise<StepResult> {
-    if (!this.stepSchema.action) {
-      throw new Error('Action not found');
-    }
-    const { url, method } = this.stepSchema.action;
-    const res = await fetch(url, {
-      method
-    });
     try {
-      const data = await res.json();
+      if (this.stepSchema.type === 'action') {
+        const res = await this.processAction(input);
+        this.status = 'completed';
+        return {
+          input: input || null,
+          output: res,
+          status: 'completed'
+        };
+      }
 
-      return {
-        status: 'success' as const,
-        payload: data
-      };
+      if (this.stepSchema.type === 'condition') {
+        const res = await this.processCondition(input);
+        this.status = 'completed';
+        return {
+          input: input || null,
+          output: res,
+          status: 'completed'
+        };
+      }
+
+      throw new Error('Invalid step type');
     } catch (error) {
       this.status = 'failed';
       return {
-        status: 'error' as const,
-        error: error as Error
+        input: input || null,
+        output: { status: 'error', error: error as Error },
+        status: 'failed'
       };
     }
   }
 
-  async processCondition(): Promise<StepResult> {
-    if (!this.stepSchema.logic) {
-      throw new Error('Logic not found');
+  async makeHttpRequest(input: StepResult | null = null): Promise<StepResult> {
+    if (!this.stepSchema.action) {
+      throw new Error('Action not found');
     }
-    const conditionMet = this.compareEvaluation(this.stepSchema.logic.operands.left, this.stepSchema.logic.operands.right);
-    if (conditionMet) {
-      this.nextStepId = this.stepSchema.logic.conditionMetNextStepId;
-    } else {
-      this.nextStepId = this.stepSchema.logic.conditionFailedNextStepId;
-    }
+
+    const { url, method } = this.stepSchema.action;
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      ...(input && { body: JSON.stringify(input) })
+    });
+
+    const data = await res.json();
     return {
       status: 'success',
-      condition: conditionMet ? 'met' : 'not_met',
+      output: data,
+      input: input || null
     };
   }
 
-  async processAction() {
-    return await this.makeHttpRequest();
+  async processCondition(input: StepResult | null = null): Promise<StepResult> {
+    if (!this.stepSchema.logic) {
+      throw new Error('Logic not found');
+    }
+
+    const conditionMet = this.compareEvaluation(
+      this.stepSchema.logic.operands.left,
+      this.stepSchema.logic.operands.right
+    );
+
+    this.nextStepId = conditionMet
+      ? this.stepSchema.logic.conditionMetNextStepId
+      : this.stepSchema.logic.conditionFailedNextStepId;
+
+    return {
+      status: 'success',
+      condition: conditionMet ? 'met' : 'not_met',
+      input: input || null
+    };
   }
 
-  compareEvaluation(left: string, right: string) {
+  async processAction(input: StepResult | null = null): Promise<StepResult> {
+    return this.makeHttpRequest(input);
+  }
+
+  compareEvaluation(left: string, right: string): boolean {
     if (!this.stepSchema.logic?.type) {
       throw new Error('Condition type not found');
     }
-    const operator = OperationToOperatorMap[this.stepSchema.logic?.type ?? 'EQUALS'];
+
+    const operator = OperationToOperatorMap[this.stepSchema.logic.type];
     const functionToEval = new Function('left', 'right', `return left ${operator} right`);
     return functionToEval(left, right);
   }
-
 }
 
- class Workflow {
-  steps!: Map<string, Step>;
-  stepsSchema!: StepType[];
-  currentStepId!: string;
-  firstStepId!: string;
-  lastStepId!: string;
-  nextStepId!: string;
-  stepsTrace: Record<string, StepResult> = {};
+export class Workflow {
+  steps: Map<string, Step>;
+  stepsSchema: StepType[];
+  currentStepId: string;
+  firstStepId: string;
+  lastStepId: string;
+  nextStepId: string;
+  stepsTrace: Record<string, StepPipeData>;
+
   constructor(steps: StepType[]) {
-    this.steps = new Map();
-    this.stepsSchema = steps;
     const [firstStep, lastStep] = findFirstLastStep(steps);
-    this.firstStepId = firstStep?.id ?? '';
-    this.lastStepId = lastStep?.id ?? '';
+
+    this.steps = new Map(steps.map(step => [step.id, new Step(step)]));
+    this.stepsSchema = steps;
+    this.firstStepId = firstStep.id;
+    this.lastStepId = lastStep.id;
     this.currentStepId = this.firstStepId;
-
-
-    for (const step of steps) {
-      this.steps.set(step.id, new Step(step));
-    }
+    this.nextStepId = this.firstStepId;
+    this.stepsTrace = {};
   }
 
-  async processStep(step: Step): Promise<StepResult> {
-    const stepResult = await step.process();
-    return stepResult;
+  async processStep(step: Step, input: StepResult | null = null): Promise<StepPipeData> {
+    return step.process(input);
   }
 
-  async go(): Promise<WorkflowResult> {
+  async iterate(input: StepResult | null = null): Promise<Record<string, StepPipeData>> {
     const currentStep = this.steps.get(this.currentStepId);
-    const stepsTrace: Record<string, StepResult> = {};
     if (!currentStep) {
       throw new Error('Current step not found');
     }
 
-    const stepResult = await this.processStep(currentStep);
-    stepsTrace[currentStep.stepSchema.id] = stepResult;
+    const stepOutput = await this.processStep(currentStep, input);
+    this.stepsTrace[currentStep.stepSchema.id] = stepOutput;
+
     if (currentStep.stepSchema.finishStep) {
-      return {
-        stepsTrace
-      }
+      return this.stepsTrace;
     }
 
     this.nextStepId = currentStep.nextStepId;
-
-    if (!this.nextStepId) {
-      return {
-        stepsTrace
-      };
-    }
-
     this.currentStepId = this.nextStepId;
-    return this.go();
+    return this.iterate(stepOutput.output);
   }
 
-  async start() {
+  async start(): Promise<Record<string, StepPipeData>> {
     this.currentStepId = this.firstStepId;
-    return this.go();
+    return this.iterate();
   }
 }
 
-const createWorkflow = async (workflowDefinition: WorkflowDefinition): Promise<Workflow> => {
-  const workflow = new Workflow(workflowDefinition.steps);
-  return workflow;
+export const createWorkflow = async (workflowDefinition: WorkflowDefinition): Promise<Workflow> => {
+  return new Workflow(workflowDefinition.steps);
 };
 
 app.post('*', async (req: Request, res: Response) => {
@@ -218,14 +235,12 @@ app.post('*', async (req: Request, res: Response) => {
   }
 });
 
-const startWorkflowService = async () => {
+export const startWorkflowService = async (): Promise<unknown> => {
   console.log('Starting workflow service on port', port);
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
       resolve(app);
     });
   });
-}
-
-export { startWorkflowService };
+};

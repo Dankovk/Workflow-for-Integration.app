@@ -1,6 +1,8 @@
 # Requirements
 
 - Bun 1.0+
+- Node.js 18+
+
  You can use this bash script to install bun:
 ```bash
 curl -fsSL https://bun.sh/install | bash
@@ -12,6 +14,37 @@ bun install
 ```
 
 ## Preview and Testing
+This workflow is designed to be run in a single terminal window. It will start the workflow service and the third-party mock API service, to illustrate step payload piping usage within next steps.
+
+
+## Mock API endpoints
+
+- `/bitcoin-rate` - returns the current bitcoin rate.
+```typescript
+{
+  btcToUsdRate: number;
+  usdToBtcRate: number;
+}
+```
+- `/current-balance` - returns the current balance of the user.
+```typescript
+{
+  balance: number;
+}
+```
+- `/process-high-balance` - processes the high balance of the user.
+```typescript
+{
+  balance: number;
+}
+```
+- `/process-low-balance` - processes the low balance of the user.
+```typescript
+{
+  balance: number;
+}
+```
+
 ```bash
 bun run start
 ```

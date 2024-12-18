@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Service Tester</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-area {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        textarea {
+            flex: 1;
+            min-height: 400px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .primary {
+            background: #0066ff;
+            color: white;
+        }
+        .secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f8f8;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Workflow Service Tester</h1>
+        <div class="input-area">
+            <textarea id="workflowInput" placeholder="Enter your workflow schema here..."></textarea>
+            <div class="buttons">
+                <button class="primary" onclick="runWorkflow()">Run Workflow</button>
+                <button class="secondary" onclick="loadPredefinedSchema()">Load Predefined Schema</button>
+                <button class="secondary" onclick="clearSchema()">Clear</button>
+            </div>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const predefinedSchema = {
+            steps: [
+                {
+                    id: 'step1',
+                    name: 'Fetch Bitcoin Rate',
+                    type: 'action',
+                    startStep: true,
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/bitcoin-rate',
+                        method: 'GET',
+                        nextStepId: 'step2'
+                    }
+                },
+                {
+                    id: 'step2',
+                    name: 'Check Current Balance',
+                    type: 'action',
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/current-balance',
+                        method: 'POST',
+                        nextStepId: 'step3'
+                    }
+                },
+                {
+                    id: 'step3',
+                    name: 'Check If Balance Sufficient',
+                    type: 'condition',
+                    logic: {
+                        type: 'GREATER_THAN',
+                        operands: {
+                            left: '10000',
+                            right: '5000'
+                        },
+                        conditionMetNextStepId: 'step4',
+                        conditionFailedNextStepId: 'step5'
+                    }
+                },
+                {
+                    id: 'step4',
+                    name: 'Process High Balance',
+                    type: 'action',
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/process-high-balance',
+                        method: 'POST',
+                        body: { type: 'high_balance' },
+                        nextStepId: 'step6'
+                    }
+                },
+                {
+                    id: 'step5',
+                    name: 'Process Low Balance',
+                    type: 'action',
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/process-low-balance',
+                        method: 'POST',
+                        body: { type: 'low_balance' },
+                        nextStepId: 'step6'
+                    }
+                },
+                {
+                    id: 'step6',
+                    name: 'Finish',
+                    type: 'action',
+                    finishStep: true,
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/finish',
+                        method: 'POST',
+                        nextStepId: ''
+                    }
+                }
+            ]
+        };
+
+        function loadPredefinedSchema() {
+            document.getElementById('workflowInput').value = JSON.stringify(predefinedSchema, null, 2);
+        }
+
+        function clearSchema() {
+            document.getElementById('workflowInput').value = '';
+            document.getElementById('result').textContent = '';
+        }
+
+        async function runWorkflow() {
+            const resultDiv = document.getElementById('result');
+            try {
+                const workflowInput = JSON.parse(document.getElementById('workflowInput').value);
+
+                resultDiv.textContent = 'Running workflow...';
+
+                const response = await fetch('/workflow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(workflowInput),
+                });
+
+                const result = await response.json();
+                resultDiv.textContent = 'Result:\n' + JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultDiv.textContent = 'Error:\n' + error.message;
+            }
+        }
+
+        // Load predefined schema on page load
+        loadPredefinedSchema();
+    </script>
+</body>
+</html>

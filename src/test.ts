@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import type { WorkflowDefinition } from './core';
 import { workflowDefinition } from './mock';
 
 const express = require('express');
@@ -35,7 +36,7 @@ mockApiServer.post('/current-balance', (req: Request, res: Response) => {
 
     console.log('💰 Mock API: Checking current balance');
     res.json({
-      currentBalance: 10000,
+      amount: 10000,
       currency: 'USD',
       btcEquivalent: 10000,
     });
@@ -48,15 +49,13 @@ mockApiServer.post('/current-balance', (req: Request, res: Response) => {
 // Mock high balance process endpoint
 mockApiServer.post('/process-high-balance', (req: Request, res: Response) => {
   try {
-    const { previousStepPayload } = req.body;
-    console.log('📈 Mock API: Processing high balance transaction', previousStepPayload);
+    const data = req.body;
+    console.log('📈 Mock API: Processing high balance transaction', data);
     res.json({
       status: 'processed',
       type: 'high_balance',
       recommendedAction: 'invest',
-      suggestedBtcAmount: previousStepPayload?.btcEquivalent * 0.5,
-      timestamp: new Date().toISOString(),
-      previousData: previousStepPayload
+      suggestedBtcAmount: data?.btcEquivalent * 0.5
     });
   } catch (error) {
     console.error('Error in /process-high-balance endpoint:', error);
@@ -67,15 +66,14 @@ mockApiServer.post('/process-high-balance', (req: Request, res: Response) => {
 // Mock low balance process endpoint
 mockApiServer.post('/process-low-balance', (req: Request, res: Response) => {
   try {
-    const { previousStepPayload } = req.body;
-    console.log('📉 Mock API: Processing low balance transaction', previousStepPayload);
+    const data = req.body;
+    console.log('📉 Mock API: Processing low balance transaction', data);
     res.json({
       status: 'processed',
       type: 'low_balance',
       recommendedAction: 'save',
-      minimumSuggestedSaving: previousStepPayload?.currentBalance * 0.2,
-      timestamp: new Date().toISOString(),
-      previousData: previousStepPayload
+      minimumSuggestedSaving: data?.amount * 0.2,
+      previousData: data
     });
   } catch (error) {
     console.error('Error in /process-low-balance endpoint:', error);
@@ -92,9 +90,9 @@ mockApiServer.listen(mockApiPort, () => {
 
 
 
-export async function testWorkflow() {
+export async function testWorkflow(mockData: WorkflowDefinition = workflowDefinition) {
   console.log('🔄 Starting workflow test...');
-  console.log('📤 Sending workflow:', JSON.stringify(workflowDefinition, null, 2));
+  console.log('📤 Sending workflow:', JSON.stringify(mockData, null, 2));
 
   try {
     const response = await fetch('http://localhost:3000', {
@@ -102,7 +100,7 @@ export async function testWorkflow() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(workflowDefinition),
+      body: JSON.stringify(mockData),
     });
 
     if (!response.ok) {

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Engine Test Bed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-json.min.js"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">Workflow Engine Test Bed</h1>
+
+        <div class="grid grid-cols-2 gap-8">
+            <!-- Left side - Input -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Workflow Definition</h2>
+                <textarea id="workflowInput" class="w-full h-[600px] font-mono text-sm p-4 border rounded" spellcheck="false"></textarea>
+                <div class="mt-4 flex gap-4">
+                    <button onclick="startWorkflow()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
+                        Start Workflow
+                    </button>
+                    <button onclick="resetWorkflow()" class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right side - Status -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Workflow Status</h2>
+                <pre id="status" class="bg-gray-100 p-4 rounded overflow-auto h-[600px] font-mono text-sm">Waiting to start...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const workflowInput = document.getElementById('workflowInput');
+
+        const defaultWorkflow = {
+            name: 'Bitcoin Balance Check',
+            steps: [
+                {
+                    id: 'step1',
+                    name: 'Fetch Bitcoin Rate',
+                    type: 'action',
+                    startStep: true,
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/bitcoin-rate',
+                        method: 'GET',
+                        nextStepId: 'step2'
+                    }
+                },
+                {
+                    id: 'step2',
+                    name: 'Check Current Balance',
+                    type: 'action',
+                    
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/current-balance',
+                        method: 'POST',
+                        nextStepId: 'step3'
+                    }
+                },
+                {
+                    id: 'step3',
+                    name: 'Check If Balance Sufficient',
+                    type: 'condition',
+
+                    logic: {
+                        type: 'GREATER_THAN',
+                        operands: {
+                            left: '10000',
+                            right: '5000'
+                        },
+                        conditionMetNextStepId: 'step4',
+                        conditionFailedNextStepId: 'step5'
+                    }
+                },
+                {
+                    id: 'step4',
+                    name: 'Process High Balance',
+                    type: 'action',
+
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/process-high-balance',
+                        method: 'POST',
+                        nextStepId: ''
+                    }
+                },
+                {
+                    id: 'step5',
+                    name: 'Process Low Balance',
+                    type: 'action',
+                    finishStep: true,
+                    action: {
+                        type: 'FETCH',
+                        url: 'http://localhost:3001/process-low-balance',
+                        method: 'POST',
+                        nextStepId: ''
+                    }
+                }
+            ],
+            url: 'http://localhost:3000/workflow'
+        };
+
+        // Initialize workflow input
+        workflowInput.value = JSON.stringify(defaultWorkflow, null, 2);
+
+        function updateStatus(message, isError = false) {
+            const timestamp = new Date().toISOString();
+            const formattedMessage = `[${timestamp}] ${message}`;
+            statusEl.innerHTML += `\n${formattedMessage}`;
+            statusEl.scrollTop = statusEl.scrollHeight;
+
+            if (isError) {
+                console.error(message);
+            } else {
+                console.log(message);
+            }
+        }
+
+        function resetWorkflow() {
+            workflowInput.value = JSON.stringify(defaultWorkflow, null, 2);
+            statusEl.innerHTML = 'Waiting to start...';
+        }
+
+        async function startWorkflow() {
+            try {
+                updateStatus('Starting workflow...');
+
+                let workflowData;
+                try {
+                    workflowData = JSON.parse(workflowInput.value);
+                } catch (e) {
+                    throw new Error('Invalid JSON in workflow definition');
+                }
+
+                const response = await fetch('/workflow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(workflowData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                updateStatus('Workflow completed with result: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>
