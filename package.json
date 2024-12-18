@@ -1,0 +1,13 @@
+{
+	"name": "@dankovk/interview-workflow-service",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"start": "bun run ./index.ts",
+		"test": "bun run ./index.ts",
+    "dev": "bun run start & bun run --watch ./src/dev.ts"
+	},
+	"dependencies": {
+		"express": "^4.21.2"
+	}
+}

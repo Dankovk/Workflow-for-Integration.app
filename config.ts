@@ -1,0 +1,2 @@
+export const WORKFLOW_SERVICE_PORT = 3000;
+export const TEST_SERVICE_PORT = 3001;
