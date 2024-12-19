@@ -5,7 +5,7 @@
 	"scripts": {
 		"start": "bun run ./lib/minimal/index.ts",
 		"test": "bun run ./lib/overengineered/index.ts",
-		"dev": "bun run start & bun run --watch ./lib/minimal/index.ts",
+		"dev": "bun run --watch ./lib/minimal/index.ts",
 		"start:bloated": "bun run ./lib/overengineered/index.ts",
 		"dev:bloated": "bun run start:bloated & bun run --watch ./lib/overengineered/index.ts"
 	},
