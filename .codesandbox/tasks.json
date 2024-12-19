@@ -1,0 +1,22 @@
+{
+  // These tasks will run in order when initializing your CodeSandbox project.
+  "setupTasks": [
+    {
+      "command": "apk add --update nodejs npm",
+      "name": "Install node and npm"
+    },
+    {
+      "command": "npm i bun -g",
+      "name": "Install bun"
+    },
+    {
+      "command": "bun i",
+      "name": "Deps"
+    }
+  ],
+
+  // These tasks can be run from CodeSandbox. Running one will open a log in the app.
+  "tasks": {
+    "dev": "bun run dev"
+  }
+}
