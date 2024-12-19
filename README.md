@@ -1,5 +1,10 @@
 # Workflow Engine
 
+> 🚀 **Try it Live!**
+> This project is available for preview on CodeSandbox:
+> [Open in CodeSandbox](https://codesandbox.io/p/github/Dankovk/Workflow-for-Integration.app/main)
+
+
 A minimal workflow engine implementation using Bun runtime. This project provides a simple API for executing custom workflows with configurable steps and conditions.
 
 ## Features
