@@ -18,7 +18,6 @@ A minimal workflow engine implementation using Bun runtime. This project provide
 ## Prerequisites
 
 - [Bun](https://bun.sh) runtime installed
-- Vercel CLI (optional, for deployment)
 
 ## Project Structure
 
