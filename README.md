@@ -62,25 +62,59 @@ POST /execute-workflow
 Request body:
 ```json
 {
-  "definition": {
-    "steps": [
+  definition: {
+    steps: [
       {
-        "id": "step1",
-        "type": "api",
-        "url": "https://api.example.com/endpoint"
+        id: "step0",
+        type: "http",
+        config: {
+          url: "https://jsonplaceholder.typicode.com/users/{userId}",
+          method: "GET"
+        },
+        nextStepId: "step1"
+      },
+      {
+        id: "step1",
+        type: "http",
+        config: {
+          url: "https://jsonplaceholder.typicode.com/posts?userId={userId}",
+          method: "GET"
+        },
+        nextStepId: "step2"
+      },
+      {
+        id: "step2",
+        type: "branch",
+        config: {
+          condition: "outputs.step1.length > 5 && inputs.includeComments",
+          trueNextStepId: "step3",
+          falseNextStepId: "step4"
+        }
+      },
+      {
+        id: "step3",
+        type: "http",
+        config: {
+          url: "https://jsonplaceholder.typicode.com/posts/{userId}/comments",
+          method: "GET"
+        }
+      },
+      {
+        id: "step4",
+        type: "http",
+        config: {
+          url: "https://jsonplaceholder.typicode.com/users/{userId}/todos",
+          method: "GET"
+        }
       }
     ],
-    "conditions": {
-      "if": {
-        "condition": "step1.status === 200",
-        "then": ["step2"],
-        "else": ["step3"]
-      }
-    }
+    startStepId: "step0"
   },
-  "inputs": {
-    "key": "value"
+  inputs: {
+    userId: 1,
+    includeComments: true
   }
-}
+};
+
 ```
 
