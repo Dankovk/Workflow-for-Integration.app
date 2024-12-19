@@ -1,5 +1,5 @@
-import { startWorkflowService } from './src/core';
-import { testWorkflow } from './src/test';
+import { startWorkflowService } from './core';
+import { testWorkflow } from './test';
 
 startWorkflowService().then(async () => {
   try {

@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { WORKFLOW_SERVICE_PORT } from '../config';
+import { WORKFLOW_SERVICE_PORT } from './config';
 const express = require('express');
 const app = express();
 const port = WORKFLOW_SERVICE_PORT;
